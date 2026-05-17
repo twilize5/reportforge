@@ -798,8 +798,9 @@ def build_layout_from_intent(intent: ReportIntent) -> dict:
             left_w = 210
             right_w = 210
             main_x = margin + left_w + gap
-            right_x = canvas_w - margin - right_w
-            main_w = right_x - gap - main_x
+            has_filter_panel = bool(slicers)
+            right_x = canvas_w - margin - right_w if has_filter_panel else canvas_w - margin
+            main_w = right_x - gap - main_x if has_filter_panel else right_x - main_x
             content_y = header_h + gap
             content_h = canvas_h - content_y - footer_h - gap
 
@@ -811,26 +812,48 @@ def build_layout_from_intent(intent: ReportIntent) -> dict:
                     margin, content_y + i * (kpi_h + gap), left_w, kpi_h,
                 )
 
+            chart_count = min(len(charts), 4)
             col_w = int((main_w - gap) / 2)
             row_h = int((content_h - gap) / 2)
-            slots = [
-                (main_x, content_y, col_w, row_h),
-                (main_x + col_w + gap, content_y, col_w, row_h),
-                (main_x, content_y + row_h + gap, col_w, row_h),
-                (main_x + col_w + gap, content_y + row_h + gap, col_w, row_h),
-            ]
+            if chart_count == 1:
+                slots = [(main_x, content_y, main_w, content_h)]
+            elif chart_count == 2:
+                slots = [
+                    (main_x, content_y, col_w, content_h),
+                    (main_x + col_w + gap, content_y, col_w, content_h),
+                ]
+            elif chart_count == 3:
+                slots = [
+                    (main_x, content_y, col_w, row_h),
+                    (main_x + col_w + gap, content_y, col_w, row_h),
+                    (main_x, content_y + row_h + gap, main_w, row_h),
+                ]
+            else:
+                slots = [
+                    (main_x, content_y, col_w, row_h),
+                    (main_x + col_w + gap, content_y, col_w, row_h),
+                    (main_x, content_y + row_h + gap, col_w, row_h),
+                    (main_x + col_w + gap, content_y + row_h + gap, col_w, row_h),
+                ]
             for visual, slot in zip(charts[:4], slots):
                 _append_chart(containers, intent, visual, table_name, *slot)
 
-            containers.append(_textbox_vc(
-                right_x + 16, content_y + 16, right_w - 32, 30, "FILTERS",
-                font_size=11, color="#252423", bold=True,
-            ))
-            for i, slicer in enumerate(slicers[:3]):
-                _append_chart(
-                    containers, intent, slicer, table_name,
-                    right_x + 16, content_y + 58 + i * 126, right_w - 32, 104,
-                )
+            if has_filter_panel:
+                containers.append(_textbox_vc(
+                    right_x + 16, content_y + 16, right_w - 32, 30, "FILTERS",
+                    font_size=11, color="#252423", bold=True,
+                ))
+                available_filter_h = content_h - 58
+                slicer_count = min(len(slicers), 3)
+                slicer_h = max(104, int((available_filter_h - gap * max(slicer_count - 1, 0)) / max(slicer_count, 1)))
+                for i, slicer in enumerate(slicers[:3]):
+                    _append_chart(
+                        containers, intent, slicer, table_name,
+                        right_x + 16,
+                        content_y + 58 + i * (slicer_h + gap),
+                        right_w - 32,
+                        slicer_h,
+                    )
 
         # Template B: Shopify/ops-style KPI grid with large analysis panels.
         else:
