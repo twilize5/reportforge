@@ -22,6 +22,16 @@ Download pbi-tools from the project releases and use the Windows x64 core build.
 
 ## 2. Clone and Install
 
+If you received the ZIP package:
+
+```powershell
+# Extract reportforge-pbi-local.zip first, then:
+cd reportforge-pbi-local
+.\setup_local.ps1
+```
+
+If installing from Git:
+
 ```powershell
 git clone https://github.com/twilize5/reportforge.git
 cd reportforge

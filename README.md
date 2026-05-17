@@ -22,6 +22,19 @@ back to `generated_reports/`.
 
 ## Quick Start
 
+Download ZIP option:
+
+1. Download `reportforge-pbi-local.zip`.
+2. Extract it.
+3. Open PowerShell inside the extracted folder.
+4. Run:
+
+```powershell
+.\setup_local.ps1
+```
+
+Git option:
+
 ```powershell
 git clone https://github.com/twilize5/reportforge.git
 cd reportforge
@@ -42,6 +55,7 @@ Then install `pbi-tools.core` and configure Claude Desktop using
 - `setup_local.ps1` - creates local venv and installs Python dependencies.
 - `run_mcp_stdio.ps1` - starts the MCP stdio server.
 - `run_api.ps1` - starts optional local HTTP API on port 8000.
+- `make_local_package.ps1` - creates a clean distributable ZIP.
 
 ## Docs
 
