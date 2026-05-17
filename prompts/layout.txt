@@ -1,0 +1,60 @@
+Generate Power BI report layout JSON for pbi-tools section files.
+
+CRITICAL: config, filters, query, dataTransforms MUST be JSON-encoded strings
+(double-serialized), NOT nested objects. Example:
+  "config": "{\"singleVisual\":{\"visualType\":\"columnChart\"}}"
+  NOT: "config": {"singleVisual": ...}
+
+Page canvas: width=1280, height=720. Return ONLY valid JSON:
+{
+  "pages": [
+    {
+      "name": "Overview",
+      "displayName": "Overview",
+      "width": 1280,
+      "height": 720,
+      "config": "{\"objects\":{\"background\":[{\"properties\":{\"color\":{\"solid\":{\"color\":{\"expr\":{\"Literal\":{\"Value\":\"'#EAF4FC'\"}}}}},\"transparency\":{\"expr\":{\"Literal\":{\"Value\":\"0D\"}}}}}]}}",
+      "visualContainers": [
+        {
+          "x": 14, "y": 76, "width": 210, "height": 170,
+          "config": "{\"singleVisual\":{\"visualType\":\"card\",...}}",
+          "filters": "[]",
+          "query": "{}",
+          "dataTransforms": "{}"
+        }
+      ]
+    }
+  ]
+}
+
+Template rules:
+- Pick ONE template before placing visuals. Do not tile visuals freely.
+- Use a light blue or light gray canvas, white visual panels, subtle blue-gray borders, and 14px gaps.
+- Keep a header band area from y=0 to y=62 with the dashboard title at the left.
+- Reserve a right filter panel when slicers exist: x=1056, y=76, width=210, height<=608.
+- Put slicers only inside the right filter panel. Never mix slicers into the chart grid.
+- Limit the first page to 4 charts, 4 KPI cards in rail mode, or 8 KPI cards in grid mode.
+- Prefer readable analysis over completeness; unused dataset fields should not create extra visuals.
+
+Template A - KPI rail dashboard:
+- Use when there are 1-4 KPI cards.
+- KPI rail: x=14, y=76, width=210, stacked cards with 14px gaps.
+- Main chart area: x=238, y=76, width=804, height=608.
+- Main chart slots: two columns and two rows.
+  Slot 1: x=238, y=76, width=395, height=297.
+  Slot 2: x=647, y=76, width=395, height=297.
+  Slot 3: x=238, y=387, width=395, height=297.
+  Slot 4: x=647, y=387, width=395, height=297.
+
+Template B - KPI grid / operations dashboard:
+- Use when there are 5-8 KPI cards.
+- KPI grid: x=14 to x=1042, y=76, two rows max, four cards per row.
+- Chart row starts below KPI grid. Use three equal chart cards, then one optional wide bottom panel.
+- Right filter panel remains x=1056, y=76, width=210.
+
+Visual styling rules:
+- Titles must be uppercase, bold, and short.
+- Avoid legends unless a chart has multiple series.
+- Avoid dense labels. Prefer axes and gridlines over data labels on every point.
+- Tables are allowed only as one wide bottom panel, never in small slots.
+- Do not overlap visuals and do not exceed the 1280x720 canvas.

@@ -1,0 +1,324 @@
+import json, os, io, struct, zipfile, shutil
+from pathlib import Path
+from models import ProjectState
+
+def write_project(state: ProjectState) -> str:
+    """Write all project files to state.project_dir. Returns project_dir."""
+    base = Path(state.project_dir)
+    base.mkdir(parents=True, exist_ok=True)
+
+    _write_pbixproj(base, state.m_code or {})
+    _write_version(base)
+    _write_report_metadata(base)
+    _write_report_settings(base)
+    _write_diagram_layout(base)
+    _write_bim(base, state.bim or {})
+    _write_m(base, state.m_code or {})
+    _write_layout(base, state.layout or {})
+    if state.theme:
+        _write_theme(base, state.theme, state.intent.report_title if state.intent else "Report")
+    return str(base)
+
+
+def _write_pbixproj(base: Path, m_code: dict):
+    # queries must be a dict {"QueryName": "SectionFileName"} — not an array
+    # serializationMode "Raw" = single database.json file with full TMSL payload
+    manifest = {
+        "version": "0.10",
+        "settings": {
+            "model": {"serializationMode": "Raw"},
+            "pbiSessions": []
+        },
+        "queries": {name: "Section1" for name in m_code.keys()}
+    }
+    (base / ".pbixproj.json").write_text(json.dumps(manifest, indent=2))
+
+
+def _write_version(base: Path):
+    # Required by pbi-tools; matches PBIX format version used by Power BI Desktop
+    (base / "Version.txt").write_text("1.25")
+
+
+def _write_report_metadata(base: Path):
+    (base / "ReportMetadata.json").write_text(json.dumps({
+        "Version": 5,
+        "AutoCreatedRelationships": [],
+        "FileDescription": "",
+        "CreatedFrom": "Cloud",
+        "CreatedFromRelease": "2024.11"
+    }, indent=2))
+
+
+def _write_report_settings(base: Path):
+    (base / "ReportSettings.json").write_text(json.dumps({
+        "Version": 1,
+        "ReportSettings": {},
+        "QueriesSettings": {
+            "TypeDetectionEnabled": True,
+            "RelationshipImportEnabled": True,
+            "RunBackgroundAnalysis": True,
+            "Version": "2.130.0.0"
+        }
+    }, indent=2))
+
+
+def _write_diagram_layout(base: Path):
+    (base / "DiagramLayout.json").write_text(json.dumps({
+        "version": "1.1.0",
+        "diagrams": [{"ordinal": 0, "scrollPosition": {"x": 0, "y": 0}, "nodes": [], "zoomValue": 100}]
+    }, indent=2))
+
+
+def _write_bim(base: Path, bim: dict):
+    model_dir = base / "Model"
+    model_dir.mkdir(exist_ok=True)
+    # pbi-tools expects "database.json" (not ".bim") regardless of serialization mode
+    (model_dir / "database.json").write_text(
+        json.dumps(bim, indent=2, ensure_ascii=False))
+
+
+def _write_m(base: Path, m_code: dict):
+    mashup_dir = base / "Mashup" / "Package" / "Formulas"
+    mashup_dir.mkdir(parents=True, exist_ok=True)
+    lines = ["section Section1;\n"]
+    for name, expr in m_code.items():
+        lines.append(f'shared #"{name}" = {expr};\n')
+    (mashup_dir / "Section1.m").write_text("\n".join(lines))
+
+
+def _write_layout(base: Path, layout: dict):
+    report_dir = base / "Report"
+    sections_dir = report_dir / "sections"
+    sections_dir.mkdir(parents=True, exist_ok=True)
+
+    pages = layout.get("pages", [])
+
+    # Report/config.json — required by pbi-tools
+    (report_dir / "config.json").write_text(json.dumps({
+        "version": "5.59",
+        "themeCollection": {
+            "baseTheme": {"name": "CY24SU10", "version": "5.59", "type": 2}
+        },
+        "activeSectionIndex": 0,
+        "defaultDrillFilterOtherVisuals": True,
+        "slowDataSourceSettings": {
+            "isCrossHighlightingDisabled": False,
+            "isSlicerSelectionsButtonEnabled": False,
+            "isFilterSelectionsButtonEnabled": False,
+            "isFieldWellButtonEnabled": False,
+            "isApplyAllButtonEnabled": False
+        },
+        "linguisticSchemaSyncVersion": 2,
+        "settings": {}
+    }, indent=2))
+
+    (report_dir / "report.json").write_text(json.dumps({
+        "id": "00000000-0000-0000-0000-000000000000",
+        "pods": [],
+        "resourcePackages": [],
+        "sections": [p["name"] for p in pages],
+        "theme": {"name": "CY24SU10", "version": "5.59"},
+        "config": "{}", "filters": "[]"
+    }, indent=2))
+
+    for page in pages:
+        page = _fix_serialization(page)
+        (sections_dir / f"{page['name']}.json").write_text(
+            json.dumps(page, indent=2, ensure_ascii=False))
+
+
+def _write_theme(base: Path, theme: dict, title: str):
+    """Write PBI theme to StaticResources so it's applied to the report."""
+    res_dir = base / "Report" / "StaticResources" / "RegisteredResources"
+    res_dir.mkdir(parents=True, exist_ok=True)
+    theme_name = f"{title.replace(' ', '_')}_Theme"
+    (res_dir / f"{theme_name}.json").write_text(
+        json.dumps(theme, indent=2))
+
+
+def _fix_serialization(page: dict) -> dict:
+    """CRITICAL: config/filters/query/dataTransforms must be strings not objects."""
+    STRING_FIELDS = {"config", "filters", "query", "dataTransforms"}
+    for vc in page.get("visualContainers", []):
+        _remove_generated_sort_metadata(vc)
+        for field in STRING_FIELDS:
+            val = vc.get(field)
+            if isinstance(val, (dict, list)):
+                vc[field] = json.dumps(val, ensure_ascii=False,
+                                       separators=(",", ":"))
+            elif not val:
+                vc[field] = "[]" if field == "filters" else "{}"
+    return page
+
+
+def _remove_generated_sort_metadata(vc: dict) -> None:
+    """Avoid Desktop 2026 renderer crashes from hand-authored sort expressions."""
+    raw = vc.get("config")
+    if isinstance(raw, str):
+        try:
+            config = json.loads(raw)
+        except json.JSONDecodeError:
+            return
+    elif isinstance(raw, dict):
+        config = raw
+    else:
+        return
+
+    prototype_query = (
+        config.get("singleVisual", {})
+        .get("prototypeQuery", {})
+    )
+    if isinstance(prototype_query, dict):
+        prototype_query.pop("OrderBy", None)
+
+    if isinstance(raw, str):
+        vc["config"] = json.dumps(config, ensure_ascii=False,
+                                  separators=(",", ":"))
+
+
+# ── DataMashup injection (pbi-tools.core skips Mashup; we inject manually) ───
+
+def inject_data_mashup(pbit_path: str, m_code: dict) -> None:
+    """
+    pbi-tools.core (NET8) cannot write DataMashup (NETFRAMEWORK-only DLL).
+    We manually build and inject the PackageComponents binary into the PBIT zip.
+
+    PackageComponents binary layout:
+      [4-byte LE] length of Package zip
+      [Package zip bytes]  — zip archive with Formulas/Section1.m
+      [4-byte LE] length of Permissions bytes
+      [Permissions bytes]  — minimal XML (no credentials)
+      [4-byte LE] length of Metadata bytes
+      [Metadata bytes]     — empty for placeholder reports
+    """
+    package_zip = _build_package_zip(m_code)
+    permissions = (
+        b'<?xml version="1.0" encoding="utf-8"?>'
+        b'<Permissions xmlns="http://schemas.microsoft.com/DataMashup/'
+        b'DataSourcePermissions" />'
+    )
+    metadata = b""
+
+    mashup_bytes = (
+        struct.pack("<I", len(package_zip)) + package_zip
+        + struct.pack("<I", len(permissions)) + permissions
+        + struct.pack("<I", len(metadata)) + metadata
+    )
+
+    _replace_zip_entries(pbit_path, {"DataMashup": mashup_bytes})
+
+
+def inject_report_layout(pbit_path: str, layout: dict) -> None:
+    """Write Report/Layout directly into the compiled PBIT.
+
+    The pbi-tools compile step preserves the semantic model, but with this
+    project shape it emits an empty Report/Layout sections array. Power BI
+    reads Report/Layout from the package, so we inject the generated pages
+    after compile.
+    """
+    report = _build_report_layout(layout)
+    layout_bytes = json.dumps(
+        report,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-16le")
+    _replace_zip_entries(pbit_path, {"Report/Layout": layout_bytes})
+
+
+def _build_report_layout(layout: dict) -> dict:
+    sections = []
+    for ordinal, page in enumerate(layout.get("pages", [])):
+        page = _fix_serialization(page)
+        visual_containers = []
+        for z, vc in enumerate(page.get("visualContainers", [])):
+            visual_containers.append({
+                "x": vc.get("x", 0),
+                "y": vc.get("y", 0),
+                "z": vc.get("z", z),
+                "width": vc.get("width", 300),
+                "height": vc.get("height", 200),
+                "config": vc.get("config", "{}"),
+                "filters": vc.get("filters", "[]"),
+                "query": vc.get("query", "{}"),
+                "dataTransforms": vc.get("dataTransforms", "{}"),
+            })
+        sections.append({
+            "name": page.get("name", f"ReportSection{ordinal}"),
+            "displayName": page.get("displayName", page.get("name", "Page 1")),
+            "filters": page.get("filters", "[]"),
+            "ordinal": ordinal,
+            "visualContainers": visual_containers,
+            "config": page.get("config", "{}"),
+            "width": page.get("width", 1280),
+            "height": page.get("height", 720),
+        })
+
+    return {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "pods": [],
+        "resourcePackages": [],
+        "sections": sections,
+        "theme": {"name": "CY24SU10", "version": "5.59"},
+        "config": json.dumps({
+            "version": "5.59",
+            "themeCollection": {
+                "baseTheme": {"name": "CY24SU10", "version": "5.59", "type": 2}
+            },
+            "activeSectionIndex": 0,
+            "defaultDrillFilterOtherVisuals": True,
+            "slowDataSourceSettings": {
+                "isCrossHighlightingDisabled": False,
+                "isSlicerSelectionsButtonEnabled": False,
+                "isFilterSelectionsButtonEnabled": False,
+                "isFieldWellButtonEnabled": False,
+                "isApplyAllButtonEnabled": False
+            },
+            "linguisticSchemaSyncVersion": 2,
+            "settings": {}
+        }, separators=(",", ":")),
+        "filters": "[]",
+    }
+
+
+def _replace_zip_entries(pbit_path: str, replacements: dict[str, bytes]) -> None:
+    # Rewrite the PBIT zip, replacing/inserting the requested entries.
+    tmp = pbit_path + ".tmp"
+    with zipfile.ZipFile(pbit_path, "r") as src:
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as dst:
+            for info in src.infolist():
+                if info.filename not in replacements:
+                    dst.writestr(info, src.read(info.filename))
+            for name, data in replacements.items():
+                dst.writestr(name, data)
+    shutil.move(tmp, pbit_path)
+
+
+def _build_package_zip(m_code: dict) -> bytes:
+    """Build the inner Package zip that lives inside DataMashup."""
+    m_lines = ["section Section1;"]
+    for name, expr in m_code.items():
+        m_lines.append(f'\nshared #"{name}" = {expr};')
+    m_text = "\n".join(m_lines)
+
+    content_types = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="m" ContentType="application/m" />'
+        '<Default Extension="xml" ContentType="application/xml" />'
+        "</Types>"
+    )
+    package_xml = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<Package xmlns="http://schemas.microsoft.com/DataMashup">'
+        "<Version>2.87.0</Version><MinVersion>2.87.0</MinVersion>"
+        "<Culture>en-US</Culture>"
+        "<Items><Item Id=\"Section1\" Type=\"Section\" /></Items>"
+        "</Package>"
+    )
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("Formulas/Section1.m", m_text.encode("utf-8"))
+        zf.writestr("Package.xml", package_xml)
+    return buf.getvalue()
