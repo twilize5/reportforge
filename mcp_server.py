@@ -12,7 +12,9 @@ from session_manager import require_session
 
 mcp = FastMCP("ReportForge PBI")
 
-OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "/tmp/reportforge_reports"))
+OUTPUT_DIR = Path(
+    os.getenv("OUTPUT_DIR", Path(__file__).resolve().parent / "generated_reports")
+)
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 
 

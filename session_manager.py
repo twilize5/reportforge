@@ -1,8 +1,12 @@
 import json, os, time
+from pathlib import Path
 from models import ProjectState
 
 SESSIONS: dict[str, ProjectState] = {}
-SESSION_DIR = os.getenv("SESSION_DIR", "/tmp/reportforge_sessions")
+SESSION_DIR = os.getenv(
+    "SESSION_DIR",
+    str(Path(__file__).resolve().parent / ".sessions"),
+)
 TTL_SECONDS = 7200  # 2 hours
 
 os.makedirs(SESSION_DIR, exist_ok=True)

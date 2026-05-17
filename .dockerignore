@@ -4,4 +4,5 @@ __pycache__/
 .venv/
 generated_reports/
 generated_sources/
+.sessions/
 .git/
