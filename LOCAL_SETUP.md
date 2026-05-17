@@ -114,6 +114,10 @@ Generated reports are saved in:
 generated_reports/
 ```
 
+Report filenames are intentionally shortened for Power BI Desktop/Windows
+compatibility. Long prompts are treated as styling instructions, not as literal
+file names.
+
 ## 6. Optional Local API
 
 You can also run a local HTTP server:

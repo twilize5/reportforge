@@ -21,6 +21,7 @@ Railway deployment is not the current target. The intended workflow is:
 - Build semantic model JSON, Power Query M, Power BI layout JSON, theme JSON,
   and compiled `.pbit` files.
 - Export local `.pbit` files into `generated_reports/`.
+- Shorten generated filenames to avoid Windows/Power BI path errors.
 - Apply template-based dashboard layouts:
   - KPI rail
   - KPI grid

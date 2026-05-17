@@ -12,8 +12,10 @@ from session_manager import require_session
 from mcp_server import mcp, OUTPUT_DIR
 
 
-def _safe_filename(name: str) -> str:
-    safe = re.sub(r"[^A-Za-z0-9_. -]", "_", name).strip()
+def _safe_filename(name: str, max_len: int = 48) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_. -]", "_", name).strip(" .-_")
+    safe = re.sub(r"\s+", "-", safe)
+    safe = safe[:max_len].strip(" .-_")
     return safe or "report"
 
 # Build MCP ASGI sub-app first so we can pass its lifespan to FastAPI
@@ -71,7 +73,7 @@ async def generate(
     return FileResponse(
         state.pbix_path,
         media_type="application/octet-stream",
-        filename=f"{state.intent.report_title}.pbit"
+        filename=f"{_safe_filename(state.intent.report_title)}.pbit"
     )
 
 @app.post("/session/{session_id}/add-visual")
@@ -106,7 +108,7 @@ async def export(session_id: str):
     return FileResponse(
         pbix_path,
         media_type="application/octet-stream",
-        filename=f"{state.intent.report_title if state.intent else 'report'}.pbit"
+        filename=f"{_safe_filename(state.intent.report_title if state.intent else 'report')}.pbit"
     )
 
 @app.post("/generate-from-csv")
@@ -134,7 +136,7 @@ async def generate_from_csv(
     return FileResponse(
         state.pbix_path,
         media_type="application/octet-stream",
-        filename=f"{state.intent.report_title}.pbit"
+        filename=f"{_safe_filename(state.intent.report_title)}.pbit"
     )
 
 

@@ -119,7 +119,10 @@ async def pipeline_from_csv(csv_bytes: bytes, filename: str = "data.csv",
 
     intent = build_intent_from_profile(profile, filename)
     if prompt:
-        intent.report_title = prompt.strip().title()
+        intent.report_title = _report_title_from_prompt(
+            prompt,
+            intent.report_title,
+        )
     state.intent = intent
 
     table_name = intent.tables[0].name
@@ -189,6 +192,19 @@ def persist_csv_source(csv_bytes: bytes, filename: str, session_id: str) -> Path
     csv_path = source_dir / safe_filename
     csv_path.write_bytes(csv_bytes)
     return csv_path.resolve()
+
+
+def _report_title_from_prompt(prompt: str, fallback: str) -> str:
+    """Use prompt as a title only when it is clearly title-sized."""
+    clean = " ".join(prompt.split()).strip()
+    if not clean:
+        return fallback
+    # Long prompts are usually styling/instruction text. Keeping the generated
+    # data-derived title avoids giant Windows filenames and Power BI open errors.
+    if len(clean) > 70 or clean.count(" ") > 10:
+        return fallback
+    safe = re.sub(r"[^A-Za-z0-9&,.() -]", "", clean).strip(" .-_")
+    return safe.title() if safe else fallback
 
 
 def inline_m_partition_sources(bim: dict | None, m_code: dict) -> None:

@@ -18,8 +18,10 @@ OUTPUT_DIR = Path(
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 
 
-def _safe_filename(name: str) -> str:
-    safe = re.sub(r"[^A-Za-z0-9_. -]", "_", name).strip()
+def _safe_filename(name: str, max_len: int = 48) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_. -]", "_", name).strip(" .-_")
+    safe = re.sub(r"\s+", "-", safe)
+    safe = safe[:max_len].strip(" .-_")
     return safe or "report"
 
 
@@ -155,7 +157,7 @@ async def export_pbix(session_id: str) -> dict:
         "session_id": session_id,
         "file_size_kb": round(len(pbix_bytes) / 1024, 1),
         "pbix_base64": base64.b64encode(pbix_bytes).decode(),
-        "filename": f"{state.intent.report_title if state.intent else 'report'}.pbix",
+        "filename": f"{_safe_filename(state.intent.report_title if state.intent else 'report')}.pbix",
         "message": "Decode base64 and save as .pbix to open in Power BI Desktop."
     }
 
@@ -229,7 +231,7 @@ async def create_from_csv(
     return {
         "session_id": state.session_id,
         "pbix_base64": pbix_b64,
-        "filename": f"{state.intent.report_title if state.intent else filename}.pbit",
+        "filename": f"{_safe_filename(state.intent.report_title if state.intent else filename)}.pbit",
         "report_title": state.intent.report_title if state.intent else filename,
         "columns_detected": len(profile.columns) if profile else 0,
         "measures_found": profile.measures if profile else [],
