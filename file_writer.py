@@ -152,7 +152,7 @@ def _fix_serialization(page: dict) -> dict:
 
 
 def _remove_generated_sort_metadata(vc: dict) -> None:
-    """Avoid Desktop 2026 renderer crashes from hand-authored sort expressions."""
+    """Avoid Desktop 2026 renderer crashes from generated sort expressions."""
     raw = vc.get("config")
     if isinstance(raw, str):
         try:
@@ -164,16 +164,30 @@ def _remove_generated_sort_metadata(vc: dict) -> None:
     else:
         return
 
-    prototype_query = (
-        config.get("singleVisual", {})
-        .get("prototypeQuery", {})
-    )
-    if isinstance(prototype_query, dict):
-        prototype_query.pop("OrderBy", None)
+    _strip_sort_keys(config)
 
     if isinstance(raw, str):
         vc["config"] = json.dumps(config, ensure_ascii=False,
                                   separators=(",", ":"))
+
+
+def _strip_sort_keys(value):
+    if isinstance(value, dict):
+        for key in list(value.keys()):
+            if key in {
+                "OrderBy",
+                "Sort",
+                "sort",
+                "SortDefinitions",
+                "sortDefinitions",
+                "hasDefaultSort",
+            }:
+                value.pop(key, None)
+            else:
+                _strip_sort_keys(value[key])
+    elif isinstance(value, list):
+        for item in value:
+            _strip_sort_keys(item)
 
 
 # ── DataMashup injection (pbi-tools.core skips Mashup; we inject manually) ───

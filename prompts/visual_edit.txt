@@ -15,6 +15,7 @@ Rules:
   full-width across both columns.
 - If no slicer exists, remove the reserved filter rail and expand the chart
   area toward the right canvas edge.
+- Do not emit sort metadata: no hasDefaultSort, OrderBy, Sort, or sortDefinitions.
 
 config field example (must be a JSON string, not an object):
   "config": "{\"singleVisual\":{\"visualType\":\"barChart\",\"projections\":{\"Category\":[{\"queryRef\":\"Sales.Region\"}],\"Y\":[{\"queryRef\":\"Total Revenue\"}]}}}"

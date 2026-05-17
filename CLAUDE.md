@@ -33,6 +33,8 @@ Railway deployment is not the current target. The intended workflow is:
   - capped visual counts to avoid clutter
 - Strip problematic generated sort metadata that caused Power BI Desktop 2026
   renderer failures.
+- Do not emit `hasDefaultSort`, `OrderBy`, `Sort`, or `sortDefinitions` in
+  generated visual configs.
 
 ## Anthropic API Usage
 

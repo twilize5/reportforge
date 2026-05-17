@@ -504,7 +504,6 @@ def _visual_config(table_name: str, visual_type: str, title: str,
                 "Select": selects,
             },
             "drillFilterOtherVisuals": True,
-            "hasDefaultSort": True,
             "objects": {
                 "background": [{
                     "properties": {

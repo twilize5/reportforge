@@ -68,3 +68,4 @@ Visual styling rules:
 - Avoid dense labels. Prefer axes and gridlines over data labels on every point.
 - Tables are allowed only as one wide bottom panel, never in small slots.
 - Do not overlap visuals and do not exceed the 1280x720 canvas.
+- Do not emit sort metadata: no hasDefaultSort, OrderBy, Sort, or sortDefinitions.
