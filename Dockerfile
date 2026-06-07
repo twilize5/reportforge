@@ -1,5 +1,5 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0
-RUN dotnet tool install --global pbi-tools
+RUN dotnet tool install --global pbi-tools.core
 ENV PATH="$PATH:/root/.dotnet/tools"
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3.11 python3-pip \
