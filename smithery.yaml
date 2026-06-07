@@ -1,0 +1,21 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      anthropicApiKey:
+        type: string
+        description: Anthropic API key (required for NL report creation and image theming)
+      outputDir:
+        type: string
+        description: Local folder where .pbit files are saved (default: generated_reports/)
+    required: []
+  commandFunction: |-
+    (config) => ({
+      command: "python",
+      args: ["mcp_stdio.py"],
+      env: {
+        ...(config.anthropicApiKey ? { ANTHROPIC_API_KEY: config.anthropicApiKey } : {}),
+        ...(config.outputDir ? { OUTPUT_DIR: config.outputDir } : {})
+      }
+    })
