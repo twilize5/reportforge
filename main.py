@@ -37,6 +37,38 @@ def health():
     return {"status": "ok", "service": "ReportForge PBI"}
 
 
+@app.get("/.well-known/mcp/server-card.json")
+def server_card():
+    return JSONResponse({
+        "serverInfo": {
+            "name": "ReportForge PBI",
+            "version": "1.0.0",
+            "description": (
+                "Generate Power BI .pbit reports from CSV datasets, "
+                "natural-language instructions, and reference-image styling. "
+                "Works with local files via Claude Desktop MCP."
+            )
+        },
+        "authentication": {
+            "type": "none"
+        },
+        "tools": [
+            {"name": "create_dashboard", "description": "Create a Power BI dashboard from a local CSV file path"},
+            {"name": "create_from_csv_text", "description": "Create a Power BI dashboard from raw CSV text"},
+            {"name": "create_from_csv", "description": "Create a Power BI dashboard from a base64-encoded CSV"},
+            {"name": "create_report", "description": "Create a report from a natural language description (requires Anthropic API key)"},
+            {"name": "add_visual", "description": "Add a visual to an existing report session"},
+            {"name": "apply_image_theme", "description": "Extract color palette from an image and apply as report theme"},
+            {"name": "edit_styling", "description": "Edit report styling via natural language"},
+            {"name": "add_filter", "description": "Add a slicer or filter to the report"},
+            {"name": "export_pbix", "description": "Export the report as base64-encoded .pbit"},
+            {"name": "export_pbit_file", "description": "Save the .pbit file locally and return its path"},
+            {"name": "export_pbit_url", "description": "Save the .pbit and return a public download URL"},
+            {"name": "get_report_state", "description": "Return the current report structure for inspection"}
+        ]
+    })
+
+
 @app.get("/reports/{filename}")
 def download_report(filename: str):
     safe_name = Path(filename).name
