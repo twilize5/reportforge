@@ -1,5 +1,7 @@
 # ReportForge PBI
 
+[![Glama MCP Server](https://glama.ai/mcp/servers/badge?id=twilize5%2Freportforge)](https://glama.ai/mcp/servers/twilize5/reportforge)
+
 Local Claude Desktop MCP app for generating Power BI `.pbit` reports from CSV
 datasets, natural-language instructions, and reference-image styling.
 
