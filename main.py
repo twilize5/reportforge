@@ -18,9 +18,8 @@ def _safe_filename(name: str, max_len: int = 48) -> str:
     safe = safe[:max_len].strip(" .-_")
     return safe or "report"
 
-# Build MCP ASGI sub-app first so we can pass its lifespan to FastAPI
-# fastmcp 3.x requires the parent app's lifespan to include the MCP lifespan
-_mcp_asgi = mcp.http_app(path="/")
+# Streamable HTTP transport (required by Smithery); also handles SSE clients
+_mcp_asgi = mcp.http_app(path="/", transport="streamable-http")
 
 app = FastAPI(
     title="ReportForge PBI",
